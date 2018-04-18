@@ -18,8 +18,6 @@ Database g_dDB = null;
 bool bLogMessage = true;
 bool bDebug = true;
 
-bool g_bLoaded = false;
-
 ConVar g_cEnable = null;
 ConVar g_cSay = null;
 ConVar g_cChat = null;
@@ -34,7 +32,7 @@ public Plugin myinfo =
 {
 	name = "SQL ChatLogs",
 	author = "Bara (Credits: McFlurry, Keith Warren (Drixevel)",
-	description = "Logs chat for all players and RCON information.",
+	description = "",
 	version = "2.0",
 	url = "github.com/Bara"
 }
@@ -54,14 +52,12 @@ public void OnPluginStart()
 	AutoExecConfig_ExecuteFile();
 	AutoExecConfig_CleanFile();
 	
-	AddCommandListener(SMSay, "sm_say");
-	AddCommandListener(SMCSay, "sm_csay");
-	AddCommandListener(SMTSay, "sm_tsay");
-	AddCommandListener(SMMSay, "sm_msay");
-	AddCommandListener(SMHSay, "sm_hsay");
-	
-	g_bLoaded = false;
-	
+	AddCommandListener(Command_Say, "sm_say");
+	AddCommandListener(Command_CSay, "sm_csay");
+	AddCommandListener(Command_TSay, "sm_tsay");
+	AddCommandListener(Command_MSay, "sm_msay");
+	AddCommandListener(Command_HSay, "sm_hsay");
+		
 	SQL_TConnect(sqlConnect, "chatlogs");
 
 	g_bSourceTV = LibraryExists("sourcetvmanager");
@@ -109,20 +105,11 @@ public void sqlCreateTable(Database db, DBResultSet results, const char[] error,
 		SetFailState("[%s] (sqlCreateTable) Fail at Query: %s", CNAME, error);
 		return;
 	}
-	else
-	{
-		g_bLoaded = true;
-	}
 }
 
 public void OnClientSayCommand_Post(int client, const char[] command, const char[] sArgs)
 {
-	if (!g_cEnable.BoolValue || !g_cChat.BoolValue || !g_bLoaded)
-	{
-		return;
-	}
-
-	if (!IsClientValid(client, true))
+	if (!g_cEnable.BoolValue || !g_cChat.BoolValue)
 	{
 		return;
 	}
@@ -146,14 +133,9 @@ public void OnClientSayCommand_Post(int client, const char[] command, const char
 	addToSQL(command, client, sArgs);
 }
 
-public Action SMSay(int client, const char[] command, int args)
+public Action Command_Say(int client, const char[] command, int args)
 {
-	if(!g_cEnable.BoolValue || !g_cSay.BoolValue || !g_bLoaded)
-	{
-		return;
-	}
-
-	if (!IsClientValid(client, true))
+	if(!g_cEnable.BoolValue || !g_cSay.BoolValue)
 	{
 		return;
 	}
@@ -169,14 +151,9 @@ public Action SMSay(int client, const char[] command, int args)
 	addToSQL(command, client, Chat, true);
 }
 
-public Action SMCSay(int client, const char[] command, int args)
+public Action Command_CSay(int client, const char[] command, int args)
 {
-	if(!g_cEnable.BoolValue || !g_cCsay.BoolValue || !g_bLoaded)
-	{
-		return;
-	}
-
-	if (!IsClientValid(client, true))
+	if(!g_cEnable.BoolValue || !g_cCsay.BoolValue)
 	{
 		return;
 	}
@@ -192,14 +169,9 @@ public Action SMCSay(int client, const char[] command, int args)
 	addToSQL(command, client, Chat, true);
 }
 
-public Action SMTSay(int client, const char[] command, int args)
+public Action Command_TSay(int client, const char[] command, int args)
 {
-	if(!g_cEnable.BoolValue || !g_cTsay.BoolValue || !g_bLoaded)
-	{
-		return;
-	}
-
-	if (!IsClientValid(client, true))
+	if(!g_cEnable.BoolValue || !g_cTsay.BoolValue)
 	{
 		return;
 	}
@@ -215,14 +187,9 @@ public Action SMTSay(int client, const char[] command, int args)
 	addToSQL(command, client, Chat, true);
 }
 
-public Action SMMSay(int client, const char[] command, int args)
+public Action Command_MSay(int client, const char[] command, int args)
 {
-	if(!g_cEnable.BoolValue || !g_cMsay.BoolValue || !g_bLoaded)
-	{
-		return;
-	}
-
-	if (!IsClientValid(client, true))
+	if(!g_cEnable.BoolValue || !g_cMsay.BoolValue)
 	{
 		return;
 	}
@@ -243,14 +210,9 @@ public Action SMMSay(int client, const char[] command, int args)
 	addToSQL(command, client, Chat, true);
 }
 
-public Action SMHSay(int client, const char[] command, int args)
+public Action Command_HSay(int client, const char[] command, int args)
 {
-	if(!g_cEnable.BoolValue || !g_cHsay.BoolValue || !g_bLoaded)
-	{
-		return;
-	}
-
-	if (!IsClientValid(client, true))
+	if(!g_cEnable.BoolValue || !g_cHsay.BoolValue)
 	{
 		return;
 	}
@@ -268,11 +230,14 @@ public Action SMHSay(int client, const char[] command, int args)
 
 void addToSQL(const char[] command, int client, const char[] text, bool adminText = false)
 {
-	char sTeam[12], sAuth[18];
+	char sTeam[12], sAuth[18], sName[MAX_NAME_LENGTH];
+	bool bAlive = false;
 	
-	if (client > 0 && client <= MaxClients)
+	if (IsClientValid(client))
 	{
+		GetClientName(client, sName, sizeof(sName));
 		GetClientAuthId(client, AuthId_SteamID64, sAuth, sizeof(sAuth));
+		bAlive = IsPlayerAlive(client);
 		
 		int team = GetClientTeam(client);
 		
@@ -296,6 +261,7 @@ void addToSQL(const char[] command, int client, const char[] text, bool adminTex
 	}
 	else
 	{
+		Format(sName, sizeof(sName), "Console");
 		Format(sTeam, sizeof(sTeam), "console");
 	}
 	
@@ -321,7 +287,11 @@ void addToSQL(const char[] command, int client, const char[] text, bool adminTex
 	}
 	
 	char sQuery[1024];
-	g_dDB.Format(sQuery, sizeof(sQuery), "INSERT INTO `chat_logs` (`time`, `tick`, `ip`, `port`, `map`, `command`, `name`, `communityid`, `alive`, `team`, `text`) VALUES (UNIX_TIMESTAMP(), %d, \"%s\", %d, \"%s\", \"%s\", \"%N\", \"%s\", %d, \"%s\", \"%s\")", iTick, sIP, iPort, sMap, command, client, sAuth, IsPlayerAlive(client), sTeam, text);
+	g_dDB.Format(sQuery, sizeof(sQuery), "INSERT INTO `chat_logs` (`time`, `tick`, `ip`, `port`, `map`, `command`, `name`, `communityid`, `alive`, `team`, `text`) VALUES (UNIX_TIMESTAMP(), %d, \"%s\", %d, \"%s\", \"%s\", \"%s\", \"%s\", %d, \"%s\", \"%s\")", iTick, sIP, iPort, sMap, command, sName, sAuth, bAlive, sTeam, text);
+
+	if(bLogMessage && bDebug)
+		LogMessage(sQuery);
+
 	g_dDB.Query(sqlInsert, sQuery);
 }
 
